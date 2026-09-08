@@ -1,12 +1,17 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // استيراد وحدات النظام المعيارية
 import { getTenantDb, listTenants, registerTenantStore } from './src/modules/db.js';
 import { sallaClient } from './src/modules/salla.js';
 import { aiAgent } from './src/modules/ai.js';
 import { seoOptimizer } from './src/modules/seo.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -63,7 +68,7 @@ app.get('/api/salla/callback', async (req, res) => {
         <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
           <h2 style="color: green;">✅ تم ربط متجرك بنجاح!</h2>
           <p>يمكنك الآن العودة إلى التطبيق.</p>
-          <a href="http://localhost:3000" style="background: #059669; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">العودة للوحة التحكم</a>
+          <a href="/" style="background: #059669; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">العودة للوحة التحكم</a>
         </body>
       </html>
     `);
@@ -123,6 +128,14 @@ app.post('/api/seo/optimize-product', tenantMiddleware, async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
+});
+
+// 🆕 خدمة ملفات الواجهة الأمامية (Client) - يجب وضعها في النهاية
+app.use(express.static(path.join(__dirname, '../client/dist')));
+
+// 🆕 إعادة توجيه جميع المسارات غير المعروفة إلى الواجهة الأمامية
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/dist/index.html'));
 });
 
 app.listen(PORT, () => {
