@@ -1,0 +1,5 @@
+node_modules/ 
+.env 
+salla_agents.db 
+.DS_Store 
+*.log 
