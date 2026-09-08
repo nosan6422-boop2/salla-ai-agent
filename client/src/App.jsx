@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react';
 
+// دالة مساعدة للتعامل مع النتائج (سواء كانت مصفوفة أو نص)
+const formatList = (list) => {
+  if (Array.isArray(list)) return list.join(' ');
+  return list || '';
+};
+
 export default function App() {
   const [tenants, setTenants] = useState([]);
   const [selectedTenant, setSelectedTenant] = useState('store_demo_1');
@@ -16,21 +22,13 @@ export default function App() {
     fetch('/api/tenants')
       .then(res => res.json())
       .then(data => {
-        console.log('✅ البيانات المستلمة من الخادم:', data); // أضفنا هذا السطر لرؤية البيانات
-        if (data.tenants && data.tenants.length > 0) {
-          setTenants(data.tenants);
-          // التأكد من أن المتجر المحدد موجود في البيانات، وإلا نختار أول متجر
-          if (!data.tenants.find(t => t.id === selectedTenant)) {
-            setSelectedTenant(data.tenants[0].id);
-          }
-        }
+        if (data.tenants) setTenants(data.tenants);
       })
       .catch(err => console.error(err));
-  }, [selectedTenant]);
+  }, []);
 
-  // دالة ربط المتجر عبر سلة
   const handleConnectStore = () => {
-    window.location.href = 'http://localhost:5000/api/salla/auth';
+    window.location.href = '/api/salla/auth';
   };
 
   const handleGenerateMarketing = async () => {
@@ -141,7 +139,8 @@ export default function App() {
             <h2 style={{ color: '#065f46' }}>{campaign.headline}</h2>
             <p><strong>Hook:</strong> {campaign.hook}</p>
             <div style={{ background: '#fff', padding: '15px', borderRadius: '8px' }}><strong>Caption:</strong><pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{campaign.caption}</pre></div>
-            <p><strong>الهاشتاقات:</strong> {campaign.hashtags?.join(' ')}</p>
+            {/* تم استبدال join بدالة formatList */}
+            <p><strong>الهاشتاقات:</strong> {formatList(campaign.hashtags)}</p>
             <p><strong>CTA:</strong> {campaign.callToAction}</p>
           </div>
         )}
@@ -153,7 +152,8 @@ export default function App() {
             <p><strong>Slug:</strong> {seoResult.slug}</p>
             <p><strong>Meta Title:</strong> {seoResult.metaTitle}</p>
             <p><strong>Meta Description:</strong> {seoResult.metaDescription}</p>
-            <p><strong>Keywords:</strong> {seoResult.keywords.join(', ')}</p>
+            {/* تم استبدال join بدالة formatList */}
+            <p><strong>Keywords:</strong> {formatList(seoResult.keywords)}</p>
             <p><strong>Score:</strong> {seoResult.seoScore}/100</p>
           </div>
         )}
