@@ -27,8 +27,9 @@ export default function App() {
       .catch(err => console.error(err));
   }, []);
 
+  // ✅ التعديل الوحيد هنا: نوجه المستخدم لتثبيت التطبيق من متجر التطبيقات
   const handleConnectStore = () => {
-    window.location.href = '/api/salla/auth';
+    window.location.href = 'https://apps.salla.sa/';
   };
 
   const handleGenerateMarketing = async () => {
@@ -139,7 +140,6 @@ export default function App() {
             <h2 style={{ color: '#065f46' }}>{campaign.headline}</h2>
             <p><strong>Hook:</strong> {campaign.hook}</p>
             <div style={{ background: '#fff', padding: '15px', borderRadius: '8px' }}><strong>Caption:</strong><pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{campaign.caption}</pre></div>
-            {/* تم استبدال join بدالة formatList */}
             <p><strong>الهاشتاقات:</strong> {formatList(campaign.hashtags)}</p>
             <p><strong>CTA:</strong> {campaign.callToAction}</p>
           </div>
@@ -152,7 +152,6 @@ export default function App() {
             <p><strong>Slug:</strong> {seoResult.slug}</p>
             <p><strong>Meta Title:</strong> {seoResult.metaTitle}</p>
             <p><strong>Meta Description:</strong> {seoResult.metaDescription}</p>
-            {/* تم استبدال join بدالة formatList */}
             <p><strong>Keywords:</strong> {formatList(seoResult.keywords)}</p>
             <p><strong>Score:</strong> {seoResult.seoScore}/100</p>
           </div>
