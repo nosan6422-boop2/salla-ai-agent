@@ -44,8 +44,11 @@ app.post('/api/webhooks/authorize', (req, res) => {
   if (result.success) {
     // استخراج بيانات المتجر من جسم الطلب القادم من سلة
     const eventData = req.body.data || {};
-    const storeId = eventData.store?.id || result.storeId;
-    const storeName = eventData.store?.name || 'متجر بدون اسم';
+    
+    // ✅ سلة ترسل المتجر داخل merchant وليس store (تم التعديل هنا)
+    const store = eventData.store || eventData.merchant || {};
+    const storeId = store.id || result.storeId;
+    const storeName = store.name || 'متجر بدون اسم';
     const accessToken = eventData.access_token;
 
     if (accessToken) {
