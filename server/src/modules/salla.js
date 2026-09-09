@@ -1,13 +1,15 @@
 import 'dotenv/config';
 
-// ذاكرة مؤقتة لحفظ التوكنات (في الوضع السهل، سلة ترسل التوكن هنا)
+// ذاكرة مؤقتة لحفظ التوكنات
 const storeTokens = new Map();
 
 export const sallaClient = {
   // 📥 استقبال التوكن من سلة عبر الويب هوك (الوضع السهل)
   handleWebhook(data) {
-    const storeId = data.store?.id || 'store_' + Date.now();
-    const accessToken = data.access_token;
+    // البيانات تصل داخل الحقل data
+    const eventData = data.data || {};
+    const storeId = eventData.store?.id || 'store_' + Date.now();
+    const accessToken = eventData.access_token;
 
     if (accessToken) {
       storeTokens.set(storeId, accessToken);
@@ -17,23 +19,18 @@ export const sallaClient = {
     return { success: false, error: 'لم يتم استلام توكن صالح' };
   },
 
-  // 🛍️ جلب المنتجات الحقيقية (باستخدام التوكن المستلم)
+  // 🛍️ جلب المنتجات الحقيقية
   async getProducts(tenant) {
-    // نبحث عن التوكن إما في قاعدة البيانات أو في الذاكرة
     const accessToken = tenant.sallaAccessToken || storeTokens.get(tenant.id);
 
     if (accessToken && !accessToken.startsWith('demo_')) {
-      // نستخدم fetch المدمج (لا حاجة لـ axios هنا)
       const response = await fetch('https://api.salla.dev/admin/v2/products', {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/json'
-        }
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
       });
 
       if (response.ok) {
         const data = await response.json();
-        return data.data; // إرجاع المنتجات الحقيقية
+        return data.data;
       } else {
         console.error('❌ خطأ في جلب منتجات سلة:', response.statusText);
         return [];
