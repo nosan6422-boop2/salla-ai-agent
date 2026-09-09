@@ -37,16 +37,29 @@ app.get('/api/tenants', (req, res) => {
   res.json({ success: true, tenants: listTenants() });
 });
 
-// ⭐ مسار الويب هوك الجديد (بدلاً من OAuth القديم)
+// ⭐ مسار الويب هوك الجديد (يقرأ التوكن ويحفظ المتجر في قاعدة البيانات)
 app.post('/api/webhooks/authorize', (req, res) => {
   const result = sallaClient.handleWebhook(req.body);
+  
   if (result.success) {
+    // استخراج بيانات المتجر من جسم الطلب القادم من سلة
+    const eventData = req.body.data || {};
+    const storeId = eventData.store?.id || result.storeId;
+    const storeName = eventData.store?.name || 'متجر بدون اسم';
+    const accessToken = eventData.access_token;
+
+    if (accessToken) {
+      // حفظ المتجر في قاعدة البيانات ليبقى حتى بعد إيقاف التشغيل
+      registerTenantStore({ storeName, sallaStoreId: storeId, sallaAccessToken: accessToken });
+      console.log(`✅ تم إضافة المتجر (${storeName}) إلى قاعدة البيانات بنجاح!`);
+    }
+    
     return res.status(200).send('OK');
   }
   res.status(400).send('Bad Request');
 });
 
-// تسجيل متجر جديد
+// تسجيل متجر جديد (يدوياً)
 app.post('/api/tenants/register', (req, res) => {
   const { storeName, sallaStoreId, sallaAccessToken, ownerEmail } = req.body;
   const tenant = registerTenantStore({ storeName, sallaStoreId, sallaAccessToken, ownerEmail });
