@@ -37,22 +37,19 @@ app.get('/api/tenants', (req, res) => {
   res.json({ success: true, tenants: listTenants() });
 });
 
-// ⭐ مسار الويب هوك الجديد (يقرأ التوكن ويحفظ المتجر في قاعدة البيانات)
-app.post('/api/webhooks/authorize', (req, res) => {
+// ⭐ مسار الويب هوك الجديد (يقرأ التوكن ويجلب اسم المتجر من API)
+app.post('/api/webhooks/authorize', async (req, res) => {
   const result = sallaClient.handleWebhook(req.body);
   
   if (result.success) {
-    // استخراج بيانات المتجر من جسم الطلب القادم من سلة
-    const eventData = req.body.data || {};
-    
-    // ✅ سلة ترسل المتجر داخل merchant وليس store (تم التعديل هنا)
-    const store = eventData.store || eventData.merchant || {};
-    const storeId = store.id || result.storeId;
-    const storeName = store.name || 'متجر بدون اسم';
-    const accessToken = eventData.access_token;
+    const storeId = result.storeId;
+    const accessToken = result.accessToken;
 
     if (accessToken) {
-      // حفظ المتجر في قاعدة البيانات ليبقى حتى بعد إيقاف التشغيل
+      // 🆕 جلب المعلومات الحقيقية من سلة (الاسم)
+      const storeInfo = await sallaClient.getStoreInfo(accessToken);
+      const storeName = storeInfo.name || 'متجر بدون اسم';
+
       registerTenantStore({ storeName, sallaStoreId: storeId, sallaAccessToken: accessToken });
       console.log(`✅ تم إضافة المتجر (${storeName}) إلى قاعدة البيانات بنجاح!`);
     }
