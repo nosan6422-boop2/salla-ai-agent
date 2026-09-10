@@ -250,16 +250,14 @@ app.post('/api/apply-seo-improvement', tenantMiddleware, async (req, res) => {
 
     console.log(`🔧 جاري تطبيق التحسينات على المنتج ${productId}...`);
 
-    // ✅ تصحيح: في Salla، حقول SEO موجودة داخل metadata
-    const updates = {
-      metadata: {}
-    };
+    // ✅ التصحيح النهائي: Salla يستخدم حقول مسطحة (metadata_title, metadata_description)
+    const updates = {};
     
     if (suggestedTitle) {
-      updates.metadata.title = suggestedTitle;
+      updates.metadata_title = suggestedTitle;
     }
     if (suggestedDescription) {
-      updates.metadata.description = suggestedDescription;
+      updates.metadata_description = suggestedDescription;
     }
 
     // إرسال التحديث إلى Salla
