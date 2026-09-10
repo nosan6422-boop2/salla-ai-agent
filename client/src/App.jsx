@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 
-// دالة مساعدة للتعامل مع النتائج (سواء كانت مصفوفة أو نص)
 const formatList = (list) => {
   if (Array.isArray(list)) return list.join(' ');
   return list || '';
@@ -15,9 +14,13 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('marketing');
   const [campaign, setCampaign] = useState(null);
   const [seoResult, setSeoResult] = useState(null);
-  const [storeAnalysis, setStoreAnalysis] = useState(null); // نتيجة تحليل المتجر
+  const [storeAnalysis, setStoreAnalysis] = useState(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState('');
+  
+  // ⭐ NEW: حالة تتبع تطبيق التحسينات على المنتجات
+  const [applyingProductId, setApplyingProductId] = useState(null);
+  const [appliedProducts, setAppliedProducts] = useState({});
 
   useEffect(() => {
     fetch('/api/tenants')
@@ -74,10 +77,10 @@ export default function App() {
     }
   };
 
-  // ⭐ NEW: دالة تحليل المتجر
   const handleAnalyzeStore = async () => {
     setLoading(true);
     setStoreAnalysis(null);
+    setAppliedProducts({});
     try {
       const res = await fetch('/api/analyze-store', {
         method: 'POST',
@@ -97,6 +100,56 @@ export default function App() {
       setStoreAnalysis({ error: true, message: err.message });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ⭐ NEW: تطبيق التحسينات على منتج حقيقي في Salla
+  const handleApplyImprovement = async (product) => {
+    if (!product.productId) {
+      alert('معرّف المنتج غير موجود. يرجى إعادة التحليل.');
+      return;
+    }
+
+    if (!window.confirm(`هل تريد تطبيق التحسينات على المنتج "${product.name}"؟\n\nسيتم تعديل المنتج فعلياً في متجرك.`)) {
+      return;
+    }
+
+    setApplyingProductId(product.productId);
+
+    try {
+      const res = await fetch('/api/apply-seo-improvement', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': selectedTenant
+        },
+        body: JSON.stringify({
+          productId: product.productId,
+          suggestedTitle: product.suggestedTitle,
+          suggestedDescription: product.suggestedDescription
+        })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setAppliedProducts(prev => ({
+          ...prev,
+          [product.productId]: { success: true }
+        }));
+      } else {
+        setAppliedProducts(prev => ({
+          ...prev,
+          [product.productId]: { success: false, error: data.error }
+        }));
+      }
+    } catch (err) {
+      setAppliedProducts(prev => ({
+        ...prev,
+        [product.productId]: { success: false, error: err.message }
+      }));
+    } finally {
+      setApplyingProductId(null);
     }
   };
 
@@ -128,7 +181,6 @@ export default function App() {
           <div style={{ background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}><h3 style={{ margin: '0 0 10px 0', color: '#6b7280', fontSize: '14px' }}>تحسينات SEO</h3><p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>15</p></div>
         </div>
 
-        {/* اختيار المتجر (يظهر في كل التبويبات) */}
         <div style={{ background: '#fff', padding: '20px', borderRadius: '10px', border: '1px solid #e5e7eb', marginBottom: '20px' }}>
           <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#374151' }}>اختر المتجر:</label>
           <select value={selectedTenant} onChange={e => setSelectedTenant(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db', marginBottom: '16px', fontSize: '14px', boxSizing: 'border-box' }}>
@@ -138,7 +190,6 @@ export default function App() {
             ))}
           </select>
 
-          {/* التسويق والـ SEO يحتاجان اسم المنتج */}
           {(activeTab === 'marketing' || activeTab === 'seo') && (
             <>
               <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#374151' }}>اسم المنتج:</label>
@@ -178,7 +229,6 @@ export default function App() {
           )}
         </div>
 
-        {/* عرض نتائج التسويق */}
         {activeTab === 'marketing' && campaign && (
           <div style={{ background: '#ecfdf5', padding: '24px', borderRadius: '10px', border: '1px solid #a7f3d0', position: 'relative' }}>
             <button onClick={() => handleCopy(JSON.stringify(campaign, null, 2), 'campaign')} style={{ position: 'absolute', top: '10px', left: '10px', background: '#059669', color: '#fff', padding: '5px 10px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>{copied === 'campaign' ? 'تم النسخ!' : 'نسخ'}</button>
@@ -190,7 +240,6 @@ export default function App() {
           </div>
         )}
 
-        {/* عرض نتائج SEO */}
         {activeTab === 'seo' && seoResult && (
           <div style={{ background: '#eff6ff', padding: '24px', borderRadius: '10px', border: '1px solid #bfdbfe', position: 'relative' }}>
             <button onClick={() => handleCopy(JSON.stringify(seoResult, null, 2), 'seo')} style={{ position: 'absolute', top: '10px', left: '10px', background: '#2563eb', color: '#fff', padding: '5px 10px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>{copied === 'seo' ? 'تم النسخ!' : 'نسخ'}</button>
@@ -203,7 +252,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ⭐ عرض نتائج تحليل المتجر */}
         {activeTab === 'analyze' && storeAnalysis && (
           <>
             {storeAnalysis.error ? (
@@ -213,7 +261,6 @@ export default function App() {
               </div>
             ) : (
               <div style={{ background: '#f5f3ff', padding: '24px', borderRadius: '10px', border: '1px solid #ddd6fe' }}>
-                {/* الملخص العام */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <h2 style={{ color: '#5b21b6', margin: 0 }}>🧠 تقرير تحليل المتجر</h2>
                   <div style={{ background: '#7c3aed', color: '#fff', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold' }}>
@@ -227,7 +274,6 @@ export default function App() {
                   <p style={{ marginTop: '8px', color: '#6b7280', fontSize: '13px' }}>عدد المنتجات في المتجر: {storeAnalysis.productsCount}</p>
                 </div>
 
-                {/* الأولويات */}
                 {storeAnalysis.topPriorities && (
                   <div style={{ background: '#fff', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
                     <strong>🎯 أهم الأولويات:</strong>
@@ -239,39 +285,74 @@ export default function App() {
                   </div>
                 )}
 
-                {/* تحليل المنتجات */}
                 <h3 style={{ color: '#5b21b6', marginBottom: '15px' }}>📦 تحليل المنتجات:</h3>
-                {storeAnalysis.products?.map((p, i) => (
-                  <div key={i} style={{ background: '#fff', padding: '15px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #e5e7eb' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                      <strong style={{ color: '#1f2937' }}>📌 {p.name}</strong>
-                      <span style={{ background: p.improvementScore >= 70 ? '#10b981' : p.improvementScore >= 40 ? '#f59e0b' : '#ef4444', color: '#fff', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>
-                        {p.improvementScore}/100
-                      </span>
-                    </div>
+                {storeAnalysis.products?.map((p, i) => {
+                  const applied = p.productId ? appliedProducts[p.productId] : null;
+                  const isApplying = applyingProductId === p.productId;
 
-                    {p.currentIssues && p.currentIssues.length > 0 && (
-                      <div style={{ marginBottom: '10px' }}>
-                        <strong style={{ color: '#dc2626', fontSize: '13px' }}>⚠️ مشاكل حالية:</strong>
-                        <ul style={{ marginTop: '5px', paddingRight: '20px' }}>
-                          {p.currentIssues.map((issue, j) => (
-                            <li key={j} style={{ color: '#7f1d1d', fontSize: '13px' }}>{issue}</li>
-                          ))}
-                        </ul>
+                  return (
+                    <div key={i} style={{ background: '#fff', padding: '15px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #e5e7eb' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                        <strong style={{ color: '#1f2937' }}>📌 {p.name}</strong>
+                        <span style={{ background: p.improvementScore >= 70 ? '#10b981' : p.improvementScore >= 40 ? '#f59e0b' : '#ef4444', color: '#fff', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>
+                          {p.improvementScore}/100
+                        </span>
                       </div>
-                    )}
 
-                    <div style={{ background: '#f0fdf4', padding: '10px', borderRadius: '6px', marginBottom: '8px' }}>
-                      <strong style={{ color: '#065f46', fontSize: '13px' }}>✨ عنوان مقترح:</strong>
-                      <p style={{ margin: '5px 0 0 0', fontSize: '13px', color: '#1f2937' }}>{p.suggestedTitle}</p>
-                    </div>
+                      {p.currentIssues && p.currentIssues.length > 0 && (
+                        <div style={{ marginBottom: '10px' }}>
+                          <strong style={{ color: '#dc2626', fontSize: '13px' }}>⚠️ مشاكل حالية:</strong>
+                          <ul style={{ marginTop: '5px', paddingRight: '20px' }}>
+                            {p.currentIssues.map((issue, j) => (
+                              <li key={j} style={{ color: '#7f1d1d', fontSize: '13px' }}>{issue}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
 
-                    <div style={{ background: '#eff6ff', padding: '10px', borderRadius: '6px' }}>
-                      <strong style={{ color: '#1e40af', fontSize: '13px' }}>📝 وصف Meta مقترح:</strong>
-                      <p style={{ margin: '5px 0 0 0', fontSize: '13px', color: '#1f2937' }}>{p.suggestedDescription}</p>
+                      <div style={{ background: '#f0fdf4', padding: '10px', borderRadius: '6px', marginBottom: '8px' }}>
+                        <strong style={{ color: '#065f46', fontSize: '13px' }}>✨ عنوان مقترح:</strong>
+                        <p style={{ margin: '5px 0 0 0', fontSize: '13px', color: '#1f2937' }}>{p.suggestedTitle}</p>
+                      </div>
+
+                      <div style={{ background: '#eff6ff', padding: '10px', borderRadius: '6px', marginBottom: '12px' }}>
+                        <strong style={{ color: '#1e40af', fontSize: '13px' }}>📝 وصف Meta مقترح:</strong>
+                        <p style={{ margin: '5px 0 0 0', fontSize: '13px', color: '#1f2937' }}>{p.suggestedDescription}</p>
+                      </div>
+
+                      {/* ⭐ NEW: زر تطبيق التحسينات */}
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <button
+                          onClick={() => handleApplyImprovement(p)}
+                          disabled={isApplying || (applied && applied.success)}
+                          style={{
+                            background: applied?.success ? '#10b981' : '#7c3aed',
+                            color: '#fff',
+                            padding: '10px 20px',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontWeight: 'bold',
+                            cursor: (isApplying || (applied && applied.success)) ? 'default' : 'pointer',
+                            fontSize: '13px',
+                            opacity: isApplying ? 0.7 : 1
+                          }}
+                        >
+                          {isApplying 
+                            ? '⏳ جاري التطبيق...' 
+                            : applied?.success 
+                              ? '✅ تم التطبيق على متجرك' 
+                              : '🚀 تطبيق التحسين على متجرك'}
+                        </button>
+
+                        {applied?.success === false && (
+                          <span style={{ color: '#dc2626', fontSize: '12px' }}>
+                            ❌ فشل: {applied.error}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </>

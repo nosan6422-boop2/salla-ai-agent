@@ -78,9 +78,9 @@ export const aiAgent = {
     }
 
     try {
-      // تجهيز قائمة المنتجات للنموذج
+      // ⭐ التعديل 1: تجهيز قائمة المنتجات مع ID لكل منتج
       const productsList = productsToAnalyze.map((p, i) => 
-        `${i + 1}. ${p.name || 'منتج بدون اسم'} | السعر: ${p.price || 'غير محدد'} | القسم: ${p.category?.name || p.category || 'غير محدد'}`
+        `[ID: ${p.id}] ${p.name || 'منتج بدون اسم'} | السعر: ${p.price || 'غير محدد'} | القسم: ${p.category?.name || p.category || 'غير محدد'}`
       ).join('\n');
 
       const prompt = `أنت خبير SEO وتسويق إلكتروني محترف لمتاجر سلة السعودية.
@@ -96,6 +96,7 @@ ${productsList}
   "summary": "ملخص قصير (سطرين) عن حالة السيو في المتجر بالعربية",
   "products": [
     {
+      "productId": "الـ ID الحقيقي للمنتج (الموجود بين [ID: ...] في بداية كل سطر)",
       "name": "اسم المنتج الأصلي",
       "currentIssues": ["مشكلة 1", "مشكلة 2"],
       "suggestedTitle": "عنوان SEO محسّن بالعربية",
@@ -109,7 +110,8 @@ ${productsList}
 ملاحظات مهمة:
 - اكتب كل النصوص بالعربية.
 - كن صريحاً في تحديد المشاكل.
-- اقترح عناوين وأوصافاً فعلية قابلة للاستخدام.`;
+- اقترح عناوين وأوصافاً فعلية قابلة للاستخدام.
+- ⚠️ مهم جداً: استخرج الـ ID الموجود بين [ID: ...] في بداية كل سطر منتج، وضعه في حقل "productId" بالضبط كما هو.`;
 
       const completion = await groqClient.chat.completions.create({
         model: 'openai/gpt-oss-20b',
@@ -119,7 +121,7 @@ ${productsList}
 
       const jsonString = completion.choices[0].message.content;
       if (jsonString) {
-        console.log('✅ تحليل المتجر من Groq:', jsonString.substring(0, 200) + '...');
+        console.log('✅ تحليل المتجر من Groq:', jsonString.substring(0, 300) + '...');
         return JSON.parse(jsonString);
       } else {
         throw new Error('لم يرد Groq بنص');

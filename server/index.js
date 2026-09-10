@@ -185,7 +185,7 @@ app.post('/api/seo/optimize-product', tenantMiddleware, async (req, res) => {
   });
 });
 
-// ⭐ NEW: مسار تحليل المتجر بالذكاء الاصطناعي
+// ⭐ مسار تحليل المتجر بالذكاء الاصطناعي
 app.post('/api/analyze-store', tenantMiddleware, async (req, res) => {
   try {
     console.log(`🔍 بدء تحليل المتجر: ${req.tenant.storeName}`);
@@ -225,6 +225,65 @@ app.post('/api/analyze-store', tenantMiddleware, async (req, res) => {
         status === 401
           ? 'انتهت صلاحية الوصول. يرجى إعادة ربط المتجر.'
           : `فشل التحليل: ${error.message}`
+    });
+  }
+});
+
+// ⭐ NEW: مسار تطبيق التحسينات على منتج حقيقي في Salla
+app.post('/api/apply-seo-improvement', tenantMiddleware, async (req, res) => {
+  try {
+    const { productId, suggestedTitle, suggestedDescription } = req.body;
+
+    if (!productId) {
+      return res.status(400).json({
+        success: false,
+        error: 'productId مطلوب'
+      });
+    }
+
+    if (!suggestedTitle && !suggestedDescription) {
+      return res.status(400).json({
+        success: false,
+        error: 'لا توجد تحسينات لتطبيقها'
+      });
+    }
+
+    console.log(`🔧 جاري تطبيق التحسينات على المنتج ${productId}...`);
+
+    // تجهيز التحديثات لـ Salla API
+    const updates = {};
+    if (suggestedTitle) {
+      updates.name = suggestedTitle;
+    }
+    if (suggestedDescription) {
+      updates.description = suggestedDescription;
+      updates.metadata = {
+        description: suggestedDescription
+      };
+    }
+
+    // إرسال التحديث إلى Salla
+    const result = await sallaClient.updateProduct(req.tenant, productId, updates);
+
+    console.log(`✅ تم تطبيق التحسينات على المنتج ${productId}`);
+
+    res.json({
+      success: true,
+      message: 'تم تطبيق التحسينات بنجاح على المتجر',
+      updatedProduct: result.data
+    });
+
+  } catch (error) {
+    console.error('❌ خطأ في تطبيق التحسينات:', error.message);
+
+    const status = error.message === 'SALLA_TOKEN_EXPIRED' ? 401 : 502;
+
+    res.status(status).json({
+      success: false,
+      error:
+        status === 401
+          ? 'انتهت صلاحية الوصول. يرجى إعادة ربط المتجر.'
+          : `فشل تطبيق التحسينات: ${error.message}`
     });
   }
 });

@@ -95,17 +95,6 @@ export const sallaClient = {
     return { success: false, error: 'لم يتم استلام توكن أو معرّف متجر صالح' };
   },
 
-  /**
-   * Fetches store details from Salla.
-   * Endpoint verified against official docs (GET /store/info), response
-   * shape: { status, success, data: { id, name, ... } }.
-   * The store name lives at data.name — NOT on the webhook's `merchant`
-   * field, which is only a numeric id.
-   *
-   * Retries once on transient network/5xx failures before giving up,
-   * since a single failed call here is what silently starves the
-   * caller of a name and (in older code) triggered a placeholder.
-   */
   async getStoreInfo(accessToken, { retries = 1 } = {}) {
     let attempt = 0;
 
@@ -176,6 +165,45 @@ export const sallaClient = {
       );
     } catch (error) {
       console.error('❌ خطأ في جلب منتجات سلة:', error.message);
+      throw error;
+    }
+  },
+
+  // ⭐ NEW: تحديث منتج موجود في Salla
+  async updateProduct(tenant, productId, updates) {
+    const storeId = normalizeStoreId(tenant.sallaStoreId);
+    const tokenData = storeId ? storeTokens.get(storeId) : null;
+    const accessToken = tenant.sallaAccessToken || tokenData?.accessToken;
+
+    if (!accessToken || isDemoToken(accessToken)) {
+      throw new Error('SALLA_NO_VALID_TOKEN');
+    }
+
+    try {
+      const response = await requestSalla(`/products/${productId}`, accessToken, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updates)
+      });
+
+      const data = await parseJsonResponse(response);
+
+      if (response.ok) {
+        console.log(`✅ تم تحديث المنتج ${productId} في Salla بنجاح`);
+        return { success: true, data: data.data };
+      }
+
+      if (response.status === 401) {
+        throw new Error('SALLA_TOKEN_EXPIRED');
+      }
+
+      throw new Error(
+        `Salla product update failed (${response.status}): ${JSON.stringify(data)}`
+      );
+    } catch (error) {
+      console.error('❌ خطأ في تحديث المنتج في Salla:', error.message);
       throw error;
     }
   },
