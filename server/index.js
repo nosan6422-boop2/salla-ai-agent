@@ -4,7 +4,8 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { getTenantDb, listTenants, registerTenantStore } from './src/modules/db.js';
+// ✅ أضفنا getTenantBySallaStoreId للـ Embedded Auth
+import { getTenantDb, listTenants, registerTenantStore, getTenantBySallaStoreId } from './src/modules/db.js';
 import { sallaClient, normalizeStoreId } from './src/modules/salla.js';
 import { aiAgent } from './src/modules/ai.js';
 import { seoOptimizer } from './src/modules/seo.js';
@@ -300,6 +301,82 @@ app.post('/api/apply-seo-improvement', tenantMiddleware, async (req, res) => {
         status === 401
           ? 'انتهت صلاحية الوصول. يرجى إعادة ربط المتجر.'
           : `فشل تطبيق التحسينات: ${error.message}`
+    });
+  }
+});
+
+// ⭐ NEW: Endpoint للتحقق من Embedded Token (Salla Embedded Pages)
+app.post('/api/embedded/auth', async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        error: 'Embedded token is required'
+      });
+    }
+
+    console.log('🔐 محاولة التحقق من Embedded Token...');
+
+    // 1. إرسال التوكن إلى Salla للتحقق منه
+    const introspectionResponse = await fetch(
+      'https://api.salla.dev/exchange-authority/v1/introspect',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'S-Source': process.env.SALLA_APP_ID
+        },
+        body: JSON.stringify({ token })
+      }
+    );
+
+    const introspectionResult = await introspectionResponse.json();
+
+    if (
+      !introspectionResponse.ok ||
+      !introspectionResult.success ||
+      !introspectionResult.data?.merchant_id
+    ) {
+      console.error('❌ فشل التحقق من التوكن:', introspectionResult);
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid embedded token'
+      });
+    }
+
+    const merchantId = String(introspectionResult.data.merchant_id);
+
+    console.log(`✅ تم التحقق من merchant_id: ${merchantId}`);
+
+    // 2. البحث عن المتجر في قاعدة البيانات
+    const tenant = await getTenantBySallaStoreId(merchantId);
+
+    if (!tenant) {
+      console.error(`❌ المتجر (${merchantId}) غير مسجل في قاعدة البيانات`);
+      return res.status(404).json({
+        success: false,
+        error: 'Merchant is not registered'
+      });
+    }
+
+    console.log(`✅ تم العثور على المتجر: ${tenant.storeName}`);
+
+    // 3. إرجاع بيانات المتجر
+    return res.json({
+      success: true,
+      merchantId,
+      tenantId: tenant.id,
+      storeName: tenant.storeName,
+      sallaStoreId: tenant.sallaStoreId
+    });
+
+  } catch (error) {
+    console.error('❌ خطأ في Embedded Auth:', error.message);
+    return res.status(500).json({
+      success: false,
+      error: 'Embedded authentication failed'
     });
   }
 });

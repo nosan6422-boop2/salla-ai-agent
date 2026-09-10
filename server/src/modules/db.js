@@ -136,3 +136,12 @@ export async function registerTenantStore(data) {
   console.log(`✅ تم إنشاء متجر جديد (${id}) في قاعدة البيانات`);
   return getTenantDb(id);
 }
+
+// ⭐ NEW: البحث عن متجر بواسطة merchant_id القادم من Salla (Embedded Pages)
+export async function getTenantBySallaStoreId(storeId) {
+  const result = await db.execute({
+    sql: 'SELECT * FROM tenants WHERE salla_store_id = ?',
+    args: [String(storeId)]
+  });
+  return rowToTenantFull(result.rows[0]);
+}
