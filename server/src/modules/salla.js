@@ -169,7 +169,7 @@ export const sallaClient = {
     }
   },
 
-  // ⭐ NEW: تحديث منتج موجود في Salla
+  // ⭐ تحديث منتج موجود في Salla (مع طباعة تشخيصية)
   async updateProduct(tenant, productId, updates) {
     const storeId = normalizeStoreId(tenant.sallaStoreId);
     const tokenData = storeId ? storeTokens.get(storeId) : null;
@@ -180,6 +180,10 @@ export const sallaClient = {
     }
 
     try {
+      // 🔍 تشخيص: طباعة ما سنرسله إلى Salla
+      console.log(`📤 إرسال إلى Salla (product ${productId}):`);
+      console.log(JSON.stringify(updates, null, 2));
+
       const response = await requestSalla(`/products/${productId}`, accessToken, {
         method: 'PUT',
         headers: {
@@ -189,6 +193,10 @@ export const sallaClient = {
       });
 
       const data = await parseJsonResponse(response);
+
+      // 🔍 تشخيص: طباعة رد Salla
+      console.log(`📥 رد Salla (${response.status}):`);
+      console.log(JSON.stringify(data, null, 2));
 
       if (response.ok) {
         console.log(`✅ تم تحديث المنتج ${productId} في Salla بنجاح`);

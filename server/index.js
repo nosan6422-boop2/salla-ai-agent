@@ -229,7 +229,7 @@ app.post('/api/analyze-store', tenantMiddleware, async (req, res) => {
   }
 });
 
-// ⭐ NEW: مسار تطبيق التحسينات على منتج حقيقي في Salla
+// ⭐ مسار تطبيق التحسينات على منتج حقيقي في Salla
 app.post('/api/apply-seo-improvement', tenantMiddleware, async (req, res) => {
   try {
     const { productId, suggestedTitle, suggestedDescription } = req.body;
@@ -250,16 +250,16 @@ app.post('/api/apply-seo-improvement', tenantMiddleware, async (req, res) => {
 
     console.log(`🔧 جاري تطبيق التحسينات على المنتج ${productId}...`);
 
-    // تجهيز التحديثات لـ Salla API
-    const updates = {};
+    // ✅ تصحيح: في Salla، حقول SEO موجودة داخل metadata
+    const updates = {
+      metadata: {}
+    };
+    
     if (suggestedTitle) {
-      updates.name = suggestedTitle;
+      updates.metadata.title = suggestedTitle;
     }
     if (suggestedDescription) {
-      updates.description = suggestedDescription;
-      updates.metadata = {
-        description: suggestedDescription
-      };
+      updates.metadata.description = suggestedDescription;
     }
 
     // إرسال التحديث إلى Salla
