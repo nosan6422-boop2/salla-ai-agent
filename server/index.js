@@ -18,19 +18,25 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-const tenantMiddleware = (req, res, next) => {
-  const tenantId = req.headers['x-tenant-id'] || req.query.tenantId || 'store_demo_1';
-  const tenant = getTenantDb(tenantId);
+// ✅ middleware أصبح async لأن getTenantDb الآن async
+const tenantMiddleware = async (req, res, next) => {
+  try {
+    const tenantId = req.headers['x-tenant-id'] || req.query.tenantId || 'store_demo_1';
+    const tenant = await getTenantDb(tenantId);
 
-  if (!tenant) {
-    return res.status(404).json({
-      success: false,
-      error: 'المتجر غير مسجل'
-    });
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'المتجر غير مسجل'
+      });
+    }
+
+    req.tenant = tenant;
+    next();
+  } catch (error) {
+    console.error('❌ خطأ في middleware المتجر:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
-
-  req.tenant = tenant;
-  next();
 };
 
 app.get('/api/health', (req, res) => {
@@ -40,11 +46,18 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-app.get('/api/tenants', (req, res) => {
-  res.json({
-    success: true,
-    tenants: listTenants()
-  });
+// ✅ listTenants أصبح async
+app.get('/api/tenants', async (req, res) => {
+  try {
+    const tenants = await listTenants();
+    res.json({
+      success: true,
+      tenants
+    });
+  } catch (error) {
+    console.error('❌ خطأ في جلب المتاجر:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 app.post('/api/webhooks/authorize', async (req, res) => {
@@ -74,7 +87,8 @@ app.post('/api/webhooks/authorize', async (req, res) => {
     console.log(`🏪 Store ID: ${storeId}`);
     console.log(`🏪 Store Name: ${storeName}`);
 
-    registerTenantStore({
+    // ✅ registerTenantStore أصبح async
+    await registerTenantStore({
       storeName,
       sallaStoreId: storeId,
       sallaAccessToken: accessToken,
@@ -92,7 +106,7 @@ app.post('/api/webhooks/authorize', async (req, res) => {
   }
 });
 
-app.post('/api/tenants/register', (req, res) => {
+app.post('/api/tenants/register', async (req, res) => {
   try {
     const { storeName, sallaStoreId, sallaAccessToken, ownerEmail } = req.body;
 
@@ -110,7 +124,8 @@ app.post('/api/tenants/register', (req, res) => {
       });
     }
 
-    const tenant = registerTenantStore({
+    // ✅ registerTenantStore أصبح async
+    const tenant = await registerTenantStore({
       storeName,
       sallaStoreId,
       sallaAccessToken,
@@ -232,7 +247,6 @@ app.post('/api/analyze-store', tenantMiddleware, async (req, res) => {
 // ⭐ مسار تطبيق التحسينات على منتج حقيقي في Salla
 app.post('/api/apply-seo-improvement', tenantMiddleware, async (req, res) => {
   try {
-    // ✅ التعديل 1: استقبال suggestedLongDescription
     const { productId, suggestedTitle, suggestedDescription, suggestedLongDescription } = req.body;
 
     if (!productId) {
@@ -251,7 +265,7 @@ app.post('/api/apply-seo-improvement', tenantMiddleware, async (req, res) => {
 
     console.log(`🔧 جاري تطبيق التحسينات على المنتج ${productId}...`);
 
-    // ✅ التعديل 2: Salla يستخدم حقول مسطحة + description للوصف الطويل
+    // ✅ Salla يستخدم حقول مسطحة + description للوصف الطويل
     const updates = {};
     
     if (suggestedTitle) {
@@ -261,7 +275,7 @@ app.post('/api/apply-seo-improvement', tenantMiddleware, async (req, res) => {
       updates.metadata_description = suggestedDescription;
     }
     if (suggestedLongDescription) {
-      updates.description = suggestedLongDescription;  // الوصف الطويل للمنتج
+      updates.description = suggestedLongDescription;
     }
 
     // إرسال التحديث إلى Salla
