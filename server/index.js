@@ -5,7 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { getTenantDb, listTenants, registerTenantStore } from './src/modules/db.js';
-import { sallaClient } from './src/modules/salla.js';
+import { sallaClient, normalizeStoreId } from './src/modules/salla.js';
 import { aiAgent } from './src/modules/ai.js';
 import { seoOptimizer } from './src/modules/seo.js';
 
@@ -18,76 +18,192 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-// 🛡️ Middleware
 const tenantMiddleware = (req, res, next) => {
   const tenantId = req.headers['x-tenant-id'] || req.query.tenantId || 'store_demo_1';
   const tenant = getTenantDb(tenantId);
-  if (!tenant) return res.status(404).json({ success: false, error: 'المتجر غير مسجل' });
+
+  if (!tenant) {
+    return res.status(404).json({
+      success: false,
+      error: 'المتجر غير مسجل'
+    });
+  }
+
   req.tenant = tenant;
   next();
 };
 
-// فحص جاهزية الخادم
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'online', message: 'خادم وكيل سلة يعمل بنجاح' });
+  res.json({
+    status: 'online',
+    message: 'خادم وكيل سلة يعمل بنجاح'
+  });
 });
 
-// جلب قائمة المتاجر
 app.get('/api/tenants', (req, res) => {
-  res.json({ success: true, tenants: listTenants() });
+  res.json({
+    success: true,
+    tenants: listTenants()
+  });
 });
 
-// ⭐ مسار الويب هوك الجديد (يقرأ التوكن ويجلب اسم المتجر من API)
 app.post('/api/webhooks/authorize', async (req, res) => {
-  const result = sallaClient.handleWebhook(req.body);
-  
-  if (result.success) {
-    const storeId = result.storeId;
-    const accessToken = result.accessToken;
+  try {
+    // IMPORTANT:
+    // Salla webhook authentication must be verified here BEFORE trusting
+    // access_token / merchant values. This is intentionally a separate
+    // security step and must be configured according to the app's selected
+    // Salla Webhook Security Strategy.
+    //
+    // Do not expose this endpoint publicly without implementing verification.
 
-    if (accessToken) {
-      // 🆕 جلب المعلومات الحقيقية من سلة (الاسم)
-      const storeInfo = await sallaClient.getStoreInfo(accessToken);
-      const storeName = storeInfo.name || 'متجر بدون اسم';
+    const result = sallaClient.handleWebhook(req.body);
 
-      registerTenantStore({ storeName, sallaStoreId: storeId, sallaAccessToken: accessToken });
-      console.log(`✅ تم إضافة المتجر (${storeName}) إلى قاعدة البيانات بنجاح!`);
+    if (!result.success) {
+      console.error('❌ Webhook payload rejected:', result.error);
+      return res.status(400).send('Bad Request');
     }
-    
+
+    const { storeId, accessToken, refreshToken, expires } = result;
+
+    // storeId coming out of handleWebhook is already normalized
+    // (see normalizeStoreId in salla.js), so it is guaranteed to be a
+    // clean integer string like "42417562" — never "42417562.0".
+    const storeInfo = await sallaClient.getStoreInfo(accessToken, { retries: 1 });
+
+    if (!storeInfo?.name) {
+      // We deliberately DO NOT fall back to a placeholder name here.
+      // Salla's `merchant` field in the webhook is only a numeric id —
+      // the real name only exists behind GET /store/info. If that call
+      // fails, the correct behavior is to fail loudly (502) and let
+      // Salla retry the webhook, not to create a permanently
+      // mislabeled tenant row.
+      console.error(`❌ تعذر التحقق من اسم المتجر (${storeId}) من Salla بعد إعادة المحاولة.`);
+      return res.status(502).json({
+        success: false,
+        error: 'تعذر جلب معلومات المتجر من Salla'
+      });
+    }
+
+    const storeName = storeInfo.name;
+
+    console.log('🏪 Salla Store Info:', storeInfo);
+    console.log(`🏪 Store ID: ${storeId}`);
+    console.log(`🏪 Store Name: ${storeName}`);
+
+    registerTenantStore({
+      storeName,
+      sallaStoreId: storeId,
+      sallaAccessToken: accessToken,
+      sallaRefreshToken: refreshToken,
+      sallaTokenExpires: expires
+    });
+
     return res.status(200).send('OK');
+  } catch (error) {
+    console.error('❌ خطأ في معالجة Salla authorize webhook:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Webhook processing failed'
+    });
   }
-  res.status(400).send('Bad Request');
 });
 
-// تسجيل متجر جديد (يدوياً)
 app.post('/api/tenants/register', (req, res) => {
-  const { storeName, sallaStoreId, sallaAccessToken, ownerEmail } = req.body;
-  const tenant = registerTenantStore({ storeName, sallaStoreId, sallaAccessToken, ownerEmail });
-  res.status(201).json({ success: true, tenant });
+  try {
+    const { storeName, sallaStoreId, sallaAccessToken, ownerEmail } = req.body;
+
+    if (!storeName || !String(storeName).trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'storeName مطلوب — لا يمكن تسجيل متجر بدون اسم حقيقي'
+      });
+    }
+
+    if (!normalizeStoreId(sallaStoreId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'sallaStoreId غير صالح'
+      });
+    }
+
+    const tenant = registerTenantStore({
+      storeName,
+      sallaStoreId,
+      sallaAccessToken,
+      ownerEmail
+    });
+
+    res.status(201).json({
+      success: true,
+      tenant
+    });
+  } catch (error) {
+    console.error('❌ خطأ في تسجيل المتجر:', error.message);
+
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
 });
 
-// جلب المنتجات
 app.get('/api/salla/products', tenantMiddleware, async (req, res) => {
-  const products = await sallaClient.getProducts(req.tenant);
-  res.json({ success: true, products });
+  try {
+    const products = await sallaClient.getProducts(req.tenant);
+
+    res.json({
+      success: true,
+      products
+    });
+  } catch (error) {
+    const status = error.message === 'SALLA_TOKEN_EXPIRED' ? 401 : 502;
+
+    res.status(status).json({
+      success: false,
+      error:
+        status === 401
+          ? 'Salla access token منتهي ويحتاج إلى refresh'
+          : 'تعذر جلب منتجات المتجر من Salla'
+    });
+  }
 });
 
-// توليد الحملة
 app.post('/api/ai/generate-campaign', tenantMiddleware, async (req, res) => {
   const { productName, productDescription, campaignGoal, platform } = req.body;
-  const campaign = await aiAgent.generateCampaign({ storeName: req.tenant.storeName, productName, productDescription, campaignGoal, platform });
-  res.json({ success: true, campaign });
+
+  const campaign = await aiAgent.generateCampaign({
+    storeName: req.tenant.storeName,
+    productName,
+    productDescription,
+    campaignGoal,
+    platform
+  });
+
+  res.json({
+    success: true,
+    campaign
+  });
 });
 
-// توليد SEO
 app.post('/api/seo/optimize-product', tenantMiddleware, async (req, res) => {
   const { productName, category, keywords } = req.body;
-  const seo = await seoOptimizer.generateProductSEO({ storeName: req.tenant.storeName, productName, category, keywords });
-  res.json({ success: true, seo });
+
+  const seo = await seoOptimizer.generateProductSEO({
+    storeName: req.tenant.storeName,
+    productName,
+    category,
+    keywords
+  });
+
+  res.json({
+    success: true,
+    seo
+  });
 });
 
-// 🆕 خدمة ملفات الواجهة الأمامية
 app.use(express.static(path.join(__dirname, '../client/dist')));
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/dist/index.html'));
 });
