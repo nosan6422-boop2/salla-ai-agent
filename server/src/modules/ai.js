@@ -110,7 +110,11 @@ ${productsList}
 - كن صريحاً في تحديد المشاكل.
 - اقترح عناوين وأوصافاً فعلية قابلة للاستخدام.
 - ⚠️ مهم جداً: استخرج الـ ID الموجود بين [ID: ...] في بداية كل سطر منتج، وضعه في حقل "productId" بالضبط كما هو.
-- ⚠️ مهم: "suggestedDescription" قصير (Meta)، بينما "suggestedLongDescription" طويل (وصف تفصيلي للمنتج).`;
+- ⚠️ مهم: "suggestedDescription" قصير (Meta)، بينما "suggestedLongDescription" طويل (وصف تفصيلي للمنتج).
+
+⚠️⚠️ تحذير صارم: كل عنصر في "products" يجب أن يحتوي على الحقول السبعة التالية بالضبط:
+  productId, name, currentIssues, suggestedTitle, suggestedDescription, suggestedLongDescription, improvementScore
+أي عنصر يفتقر لأحد هذه الحقول يعتبر رداً غير صالح. لا تختصر، لا تختصر، لا تختصر.`;
 
       const completion = await groqClient.chat.completions.create({
         model: 'openai/gpt-oss-20b',
