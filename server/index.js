@@ -49,14 +49,6 @@ app.get('/api/tenants', (req, res) => {
 
 app.post('/api/webhooks/authorize', async (req, res) => {
   try {
-    // IMPORTANT:
-    // Salla webhook authentication must be verified here BEFORE trusting
-    // access_token / merchant values. This is intentionally a separate
-    // security step and must be configured according to the app's selected
-    // Salla Webhook Security Strategy.
-    //
-    // Do not expose this endpoint publicly without implementing verification.
-
     const result = sallaClient.handleWebhook(req.body);
 
     if (!result.success) {
@@ -66,18 +58,9 @@ app.post('/api/webhooks/authorize', async (req, res) => {
 
     const { storeId, accessToken, refreshToken, expires } = result;
 
-    // storeId coming out of handleWebhook is already normalized
-    // (see normalizeStoreId in salla.js), so it is guaranteed to be a
-    // clean integer string like "42417562" — never "42417562.0".
     const storeInfo = await sallaClient.getStoreInfo(accessToken, { retries: 1 });
 
     if (!storeInfo?.name) {
-      // We deliberately DO NOT fall back to a placeholder name here.
-      // Salla's `merchant` field in the webhook is only a numeric id —
-      // the real name only exists behind GET /store/info. If that call
-      // fails, the correct behavior is to fail loudly (502) and let
-      // Salla retry the webhook, not to create a permanently
-      // mislabeled tenant row.
       console.error(`❌ تعذر التحقق من اسم المتجر (${storeId}) من Salla بعد إعادة المحاولة.`);
       return res.status(502).json({
         success: false,
@@ -200,6 +183,50 @@ app.post('/api/seo/optimize-product', tenantMiddleware, async (req, res) => {
     success: true,
     seo
   });
+});
+
+// ⭐ NEW: مسار تحليل المتجر بالذكاء الاصطناعي
+app.post('/api/analyze-store', tenantMiddleware, async (req, res) => {
+  try {
+    console.log(`🔍 بدء تحليل المتجر: ${req.tenant.storeName}`);
+
+    // 1. جلب المنتجات الحقيقية من Salla
+    const products = await sallaClient.getProducts(req.tenant);
+
+    console.log(`📦 عدد المنتجات: ${products.length}`);
+
+    // 2. تحليل المنتجات بالذكاء الاصطناعي
+    const analysis = await aiAgent.analyzeStoreProducts({
+      storeName: req.tenant.storeName,
+      products
+    });
+
+    if (analysis.error) {
+      return res.status(400).json({
+        success: false,
+        error: analysis.message
+      });
+    }
+
+    res.json({
+      success: true,
+      analysis,
+      productsCount: products.length
+    });
+
+  } catch (error) {
+    console.error('❌ خطأ في تحليل المتجر:', error.message);
+
+    const status = error.message === 'SALLA_TOKEN_EXPIRED' ? 401 : 500;
+
+    res.status(status).json({
+      success: false,
+      error:
+        status === 401
+          ? 'انتهت صلاحية الوصول. يرجى إعادة ربط المتجر.'
+          : `فشل التحليل: ${error.message}`
+    });
+  }
 });
 
 app.use(express.static(path.join(__dirname, '../client/dist')));

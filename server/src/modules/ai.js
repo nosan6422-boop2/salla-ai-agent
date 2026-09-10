@@ -13,6 +13,9 @@ if (process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== 'gsk_...') {
 }
 
 export const aiAgent = {
+  // ═══════════════════════════════════════════════════
+  // 1. توليد حملة تسويقية (الدالة الموجودة)
+  // ═══════════════════════════════════════════════════
   async generateCampaign({ storeName, productName, productDescription, campaignGoal, platform }) {
     const fallbackResponse = {
       headline: `✨ فخامة تليق بك من ${storeName} | ${productName}`,
@@ -46,10 +49,87 @@ export const aiAgent = {
       } else {
         throw new Error('لم يرد Groq بنص');
       }
-
     } catch (error) {
       console.error('❌ خطأ الاتصال بـ Groq:', error.message);
       return fallbackResponse;
+    }
+  },
+
+  // ═══════════════════════════════════════════════════
+  // 2. تحليل المتجر (الدالة الجديدة)
+  // ═══════════════════════════════════════════════════
+  async analyzeStoreProducts({ storeName, products }) {
+    // في حال عدم توفر الذكاء الاصطناعي
+    if (!groqClient) {
+      return {
+        error: true,
+        message: 'الذكاء الاصطناعي غير متاح حالياً'
+      };
+    }
+
+    // نأخذ أول 5 منتجات فقط لتحليلها (لتوفير التوكِنز)
+    const productsToAnalyze = products.slice(0, 5);
+
+    if (productsToAnalyze.length === 0) {
+      return {
+        error: true,
+        message: 'لا توجد منتجات في المتجر لتحليلها'
+      };
+    }
+
+    try {
+      // تجهيز قائمة المنتجات للنموذج
+      const productsList = productsToAnalyze.map((p, i) => 
+        `${i + 1}. ${p.name || 'منتج بدون اسم'} | السعر: ${p.price || 'غير محدد'} | القسم: ${p.category?.name || p.category || 'غير محدد'}`
+      ).join('\n');
+
+      const prompt = `أنت خبير SEO وتسويق إلكتروني محترف لمتاجر سلة السعودية.
+المتجر: ${storeName}
+إجمالي عدد المنتجات في المتجر: ${products.length}
+
+المنتجات المطلوب تحليلها (أول 5):
+${productsList}
+
+المطلوب: إرجاع JSON بهذا الشكل بالضبط:
+{
+  "overallScore": رقم من 0 إلى 100 يقيّم جودة السيو العامة للمتجر,
+  "summary": "ملخص قصير (سطرين) عن حالة السيو في المتجر بالعربية",
+  "products": [
+    {
+      "name": "اسم المنتج الأصلي",
+      "currentIssues": ["مشكلة 1", "مشكلة 2"],
+      "suggestedTitle": "عنوان SEO محسّن بالعربية",
+      "suggestedDescription": "وصف Meta محسّن (لا يتجاوز 160 حرفاً)",
+      "improvementScore": رقم من 0 إلى 100
+    }
+  ],
+  "topPriorities": ["أهم أولوية 1", "أهم أولوية 2", "أهم أولوية 3"]
+}
+
+ملاحظات مهمة:
+- اكتب كل النصوص بالعربية.
+- كن صريحاً في تحديد المشاكل.
+- اقترح عناوين وأوصافاً فعلية قابلة للاستخدام.`;
+
+      const completion = await groqClient.chat.completions.create({
+        model: 'openai/gpt-oss-20b',
+        messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' }
+      });
+
+      const jsonString = completion.choices[0].message.content;
+      if (jsonString) {
+        console.log('✅ تحليل المتجر من Groq:', jsonString.substring(0, 200) + '...');
+        return JSON.parse(jsonString);
+      } else {
+        throw new Error('لم يرد Groq بنص');
+      }
+    } catch (error) {
+      console.error('❌ خطأ في تحليل المتجر:', error.message);
+      return {
+        error: true,
+        message: `حدث خطأ في التحليل: ${error.message}`
+      };
     }
   }
 };

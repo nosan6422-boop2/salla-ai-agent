@@ -15,6 +15,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('marketing');
   const [campaign, setCampaign] = useState(null);
   const [seoResult, setSeoResult] = useState(null);
+  const [storeAnalysis, setStoreAnalysis] = useState(null); // نتيجة تحليل المتجر
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState('');
 
@@ -27,7 +28,6 @@ export default function App() {
       .catch(err => console.error(err));
   }, []);
 
-  // ✅ التعديل الوحيد هنا: نوجه المستخدم لتثبيت التطبيق من متجر التطبيقات
   const handleConnectStore = () => {
     window.location.href = 'https://apps.salla.sa/';
   };
@@ -74,6 +74,32 @@ export default function App() {
     }
   };
 
+  // ⭐ NEW: دالة تحليل المتجر
+  const handleAnalyzeStore = async () => {
+    setLoading(true);
+    setStoreAnalysis(null);
+    try {
+      const res = await fetch('/api/analyze-store', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': selectedTenant
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStoreAnalysis({ ...data.analysis, productsCount: data.productsCount });
+      } else {
+        setStoreAnalysis({ error: true, message: data.error });
+      }
+    } catch (err) {
+      console.error(err);
+      setStoreAnalysis({ error: true, message: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCopy = (text, type) => {
     navigator.clipboard.writeText(text).then(() => {
       setCopied(type);
@@ -87,6 +113,7 @@ export default function App() {
         <div style={{ fontSize: '22px', fontWeight: 'bold', marginBottom: '30px' }}>🤖 وكيل سلة</div>
         <button style={{ display: 'block', width: '100%', padding: '12px', marginBottom: '10px', background: activeTab === 'marketing' ? '#059669' : 'transparent', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', textAlign: 'right', fontSize: '16px' }} onClick={() => setActiveTab('marketing')}>📈 التسويق</button>
         <button style={{ display: 'block', width: '100%', padding: '12px', marginBottom: '10px', background: activeTab === 'seo' ? '#059669' : 'transparent', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', textAlign: 'right', fontSize: '16px' }} onClick={() => setActiveTab('seo')}>🔍 السيو (SEO)</button>
+        <button style={{ display: 'block', width: '100%', padding: '12px', marginBottom: '10px', background: activeTab === 'analyze' ? '#059669' : 'transparent', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', textAlign: 'right', fontSize: '16px' }} onClick={() => setActiveTab('analyze')}>🧠 تحليل المتجر</button>
       </div>
 
       <div style={{ flex: 1, padding: '30px' }}>
@@ -101,8 +128,9 @@ export default function App() {
           <div style={{ background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}><h3 style={{ margin: '0 0 10px 0', color: '#6b7280', fontSize: '14px' }}>تحسينات SEO</h3><p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>15</p></div>
         </div>
 
+        {/* اختيار المتجر (يظهر في كل التبويبات) */}
         <div style={{ background: '#fff', padding: '20px', borderRadius: '10px', border: '1px solid #e5e7eb', marginBottom: '20px' }}>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#374151' }}>اختر المتجر المشترك:</label>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#374151' }}>اختر المتجر:</label>
           <select value={selectedTenant} onChange={e => setSelectedTenant(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db', marginBottom: '16px', fontSize: '14px', boxSizing: 'border-box' }}>
             {tenants.length === 0 && <option value="">لا توجد متاجر</option>}
             {tenants.map(t => (
@@ -110,8 +138,13 @@ export default function App() {
             ))}
           </select>
 
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#374151' }}>اسم المنتج:</label>
-          <input type="text" value={productName} onChange={e => setProductName(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db', boxSizing: 'border-box', marginBottom: '16px', fontSize: '14px' }} placeholder="مثال: عطر العود الملكي" />
+          {/* التسويق والـ SEO يحتاجان اسم المنتج */}
+          {(activeTab === 'marketing' || activeTab === 'seo') && (
+            <>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#374151' }}>اسم المنتج:</label>
+              <input type="text" value={productName} onChange={e => setProductName(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db', boxSizing: 'border-box', marginBottom: '16px', fontSize: '14px' }} placeholder="مثال: عطر العود الملكي" />
+            </>
+          )}
 
           {activeTab === 'marketing' && (
             <>
@@ -132,8 +165,20 @@ export default function App() {
               {loading ? 'جاري التحسين...' : 'توليد بيانات SEO'}
             </button>
           )}
+
+          {activeTab === 'analyze' && (
+            <>
+              <p style={{ color: '#6b7280', marginBottom: '16px', fontSize: '14px' }}>
+                🧠 سيقوم الوكيل بجلب منتجات متجرك الحقيقية من سلة وتحليلها بالذكاء الاصطناعي لاقتراح تحسينات SEO.
+              </p>
+              <button onClick={handleAnalyzeStore} disabled={loading} style={{ background: '#7c3aed', color: '#fff', padding: '12px 24px', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px', opacity: loading ? 0.7 : 1 }}>
+                {loading ? 'جاري التحليل...' : '🚀 ابدأ تحليل المتجر'}
+              </button>
+            </>
+          )}
         </div>
 
+        {/* عرض نتائج التسويق */}
         {activeTab === 'marketing' && campaign && (
           <div style={{ background: '#ecfdf5', padding: '24px', borderRadius: '10px', border: '1px solid #a7f3d0', position: 'relative' }}>
             <button onClick={() => handleCopy(JSON.stringify(campaign, null, 2), 'campaign')} style={{ position: 'absolute', top: '10px', left: '10px', background: '#059669', color: '#fff', padding: '5px 10px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>{copied === 'campaign' ? 'تم النسخ!' : 'نسخ'}</button>
@@ -145,6 +190,7 @@ export default function App() {
           </div>
         )}
 
+        {/* عرض نتائج SEO */}
         {activeTab === 'seo' && seoResult && (
           <div style={{ background: '#eff6ff', padding: '24px', borderRadius: '10px', border: '1px solid #bfdbfe', position: 'relative' }}>
             <button onClick={() => handleCopy(JSON.stringify(seoResult, null, 2), 'seo')} style={{ position: 'absolute', top: '10px', left: '10px', background: '#2563eb', color: '#fff', padding: '5px 10px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>{copied === 'seo' ? 'تم النسخ!' : 'نسخ'}</button>
@@ -155,6 +201,80 @@ export default function App() {
             <p><strong>Keywords:</strong> {formatList(seoResult.keywords)}</p>
             <p><strong>Score:</strong> {seoResult.seoScore}/100</p>
           </div>
+        )}
+
+        {/* ⭐ عرض نتائج تحليل المتجر */}
+        {activeTab === 'analyze' && storeAnalysis && (
+          <>
+            {storeAnalysis.error ? (
+              <div style={{ background: '#fee2e2', padding: '24px', borderRadius: '10px', border: '1px solid #fecaca' }}>
+                <h3 style={{ color: '#991b1b', marginTop: 0 }}>حدث خطأ في التحليل</h3>
+                <p style={{ color: '#7f1d1d' }}>{storeAnalysis.message}</p>
+              </div>
+            ) : (
+              <div style={{ background: '#f5f3ff', padding: '24px', borderRadius: '10px', border: '1px solid #ddd6fe' }}>
+                {/* الملخص العام */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <h2 style={{ color: '#5b21b6', margin: 0 }}>🧠 تقرير تحليل المتجر</h2>
+                  <div style={{ background: '#7c3aed', color: '#fff', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold' }}>
+                    درجة السيو العامة: {storeAnalysis.overallScore}/100
+                  </div>
+                </div>
+
+                <div style={{ background: '#fff', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
+                  <strong>📋 ملخص:</strong>
+                  <p style={{ marginTop: '8px', color: '#4b5563' }}>{storeAnalysis.summary}</p>
+                  <p style={{ marginTop: '8px', color: '#6b7280', fontSize: '13px' }}>عدد المنتجات في المتجر: {storeAnalysis.productsCount}</p>
+                </div>
+
+                {/* الأولويات */}
+                {storeAnalysis.topPriorities && (
+                  <div style={{ background: '#fff', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
+                    <strong>🎯 أهم الأولويات:</strong>
+                    <ul style={{ marginTop: '8px', paddingRight: '20px' }}>
+                      {storeAnalysis.topPriorities.map((p, i) => (
+                        <li key={i} style={{ marginBottom: '5px', color: '#4b5563' }}>{p}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* تحليل المنتجات */}
+                <h3 style={{ color: '#5b21b6', marginBottom: '15px' }}>📦 تحليل المنتجات:</h3>
+                {storeAnalysis.products?.map((p, i) => (
+                  <div key={i} style={{ background: '#fff', padding: '15px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #e5e7eb' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <strong style={{ color: '#1f2937' }}>📌 {p.name}</strong>
+                      <span style={{ background: p.improvementScore >= 70 ? '#10b981' : p.improvementScore >= 40 ? '#f59e0b' : '#ef4444', color: '#fff', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>
+                        {p.improvementScore}/100
+                      </span>
+                    </div>
+
+                    {p.currentIssues && p.currentIssues.length > 0 && (
+                      <div style={{ marginBottom: '10px' }}>
+                        <strong style={{ color: '#dc2626', fontSize: '13px' }}>⚠️ مشاكل حالية:</strong>
+                        <ul style={{ marginTop: '5px', paddingRight: '20px' }}>
+                          {p.currentIssues.map((issue, j) => (
+                            <li key={j} style={{ color: '#7f1d1d', fontSize: '13px' }}>{issue}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div style={{ background: '#f0fdf4', padding: '10px', borderRadius: '6px', marginBottom: '8px' }}>
+                      <strong style={{ color: '#065f46', fontSize: '13px' }}>✨ عنوان مقترح:</strong>
+                      <p style={{ margin: '5px 0 0 0', fontSize: '13px', color: '#1f2937' }}>{p.suggestedTitle}</p>
+                    </div>
+
+                    <div style={{ background: '#eff6ff', padding: '10px', borderRadius: '6px' }}>
+                      <strong style={{ color: '#1e40af', fontSize: '13px' }}>📝 وصف Meta مقترح:</strong>
+                      <p style={{ margin: '5px 0 0 0', fontSize: '13px', color: '#1f2937' }}>{p.suggestedDescription}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
