@@ -14,7 +14,7 @@ if (process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== 'gsk_...') {
 
 export const aiAgent = {
   // ═══════════════════════════════════════════════════
-  // 1. توليد حملة تسويقية (الدالة الموجودة)
+  // 1. توليد حملة تسويقية
   // ═══════════════════════════════════════════════════
   async generateCampaign({ storeName, productName, productDescription, campaignGoal, platform }) {
     const fallbackResponse = {
@@ -56,10 +56,9 @@ export const aiAgent = {
   },
 
   // ═══════════════════════════════════════════════════
-  // 2. تحليل المتجر (الدالة الجديدة)
+  // 2. تحليل المتجر
   // ═══════════════════════════════════════════════════
   async analyzeStoreProducts({ storeName, products }) {
-    // في حال عدم توفر الذكاء الاصطناعي
     if (!groqClient) {
       return {
         error: true,
@@ -67,7 +66,6 @@ export const aiAgent = {
       };
     }
 
-    // نأخذ أول 5 منتجات فقط لتحليلها (لتوفير التوكِنز)
     const productsToAnalyze = products.slice(0, 5);
 
     if (productsToAnalyze.length === 0) {
@@ -78,7 +76,6 @@ export const aiAgent = {
     }
 
     try {
-      // ⭐ التعديل 1: تجهيز قائمة المنتجات مع ID لكل منتج
       const productsList = productsToAnalyze.map((p, i) => 
         `[ID: ${p.id}] ${p.name || 'منتج بدون اسم'} | السعر: ${p.price || 'غير محدد'} | القسم: ${p.category?.name || p.category || 'غير محدد'}`
       ).join('\n');
@@ -99,8 +96,9 @@ ${productsList}
       "productId": "الـ ID الحقيقي للمنتج (الموجود بين [ID: ...] في بداية كل سطر)",
       "name": "اسم المنتج الأصلي",
       "currentIssues": ["مشكلة 1", "مشكلة 2"],
-      "suggestedTitle": "عنوان SEO محسّن بالعربية",
+      "suggestedTitle": "عنوان SEO محسّن بالعربية (لا يتجاوز 60 حرفاً)",
       "suggestedDescription": "وصف Meta محسّن (لا يتجاوز 160 حرفاً)",
+      "suggestedLongDescription": "وصف تسويقي طويل وجذاب (من 3 إلى 5 أسطر) يصف المنتج بمزايا وتفاصيل تجعله جذاباً للعميل. اكتب بالعربية الفصحى مع إبراز الفوائد والجودة.",
       "improvementScore": رقم من 0 إلى 100
     }
   ],
@@ -111,7 +109,8 @@ ${productsList}
 - اكتب كل النصوص بالعربية.
 - كن صريحاً في تحديد المشاكل.
 - اقترح عناوين وأوصافاً فعلية قابلة للاستخدام.
-- ⚠️ مهم جداً: استخرج الـ ID الموجود بين [ID: ...] في بداية كل سطر منتج، وضعه في حقل "productId" بالضبط كما هو.`;
+- ⚠️ مهم جداً: استخرج الـ ID الموجود بين [ID: ...] في بداية كل سطر منتج، وضعه في حقل "productId" بالضبط كما هو.
+- ⚠️ مهم: "suggestedDescription" قصير (Meta)، بينما "suggestedLongDescription" طويل (وصف تفصيلي للمنتج).`;
 
       const completion = await groqClient.chat.completions.create({
         model: 'openai/gpt-oss-20b',

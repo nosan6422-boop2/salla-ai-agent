@@ -232,7 +232,8 @@ app.post('/api/analyze-store', tenantMiddleware, async (req, res) => {
 // ⭐ مسار تطبيق التحسينات على منتج حقيقي في Salla
 app.post('/api/apply-seo-improvement', tenantMiddleware, async (req, res) => {
   try {
-    const { productId, suggestedTitle, suggestedDescription } = req.body;
+    // ✅ التعديل 1: استقبال suggestedLongDescription
+    const { productId, suggestedTitle, suggestedDescription, suggestedLongDescription } = req.body;
 
     if (!productId) {
       return res.status(400).json({
@@ -241,7 +242,7 @@ app.post('/api/apply-seo-improvement', tenantMiddleware, async (req, res) => {
       });
     }
 
-    if (!suggestedTitle && !suggestedDescription) {
+    if (!suggestedTitle && !suggestedDescription && !suggestedLongDescription) {
       return res.status(400).json({
         success: false,
         error: 'لا توجد تحسينات لتطبيقها'
@@ -250,7 +251,7 @@ app.post('/api/apply-seo-improvement', tenantMiddleware, async (req, res) => {
 
     console.log(`🔧 جاري تطبيق التحسينات على المنتج ${productId}...`);
 
-    // ✅ التصحيح النهائي: Salla يستخدم حقول مسطحة (metadata_title, metadata_description)
+    // ✅ التعديل 2: Salla يستخدم حقول مسطحة + description للوصف الطويل
     const updates = {};
     
     if (suggestedTitle) {
@@ -258,6 +259,9 @@ app.post('/api/apply-seo-improvement', tenantMiddleware, async (req, res) => {
     }
     if (suggestedDescription) {
       updates.metadata_description = suggestedDescription;
+    }
+    if (suggestedLongDescription) {
+      updates.description = suggestedLongDescription;  // الوصف الطويل للمنتج
     }
 
     // إرسال التحديث إلى Salla

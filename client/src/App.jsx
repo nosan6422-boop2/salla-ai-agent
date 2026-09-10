@@ -18,7 +18,6 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState('');
   
-  // ⭐ NEW: حالة تتبع تطبيق التحسينات على المنتجات
   const [applyingProductId, setApplyingProductId] = useState(null);
   const [appliedProducts, setAppliedProducts] = useState({});
 
@@ -103,7 +102,7 @@ export default function App() {
     }
   };
 
-  // ⭐ NEW: تطبيق التحسينات على منتج حقيقي في Salla
+  // ⭐ التعديل 1: إرسال الوصف الطويل أيضاً
   const handleApplyImprovement = async (product) => {
     if (!product.productId) {
       alert('معرّف المنتج غير موجود. يرجى إعادة التحليل.');
@@ -126,7 +125,8 @@ export default function App() {
         body: JSON.stringify({
           productId: product.productId,
           suggestedTitle: product.suggestedTitle,
-          suggestedDescription: product.suggestedDescription
+          suggestedDescription: product.suggestedDescription,
+          suggestedLongDescription: product.suggestedLongDescription
         })
       });
 
@@ -311,16 +311,23 @@ export default function App() {
                       )}
 
                       <div style={{ background: '#f0fdf4', padding: '10px', borderRadius: '6px', marginBottom: '8px' }}>
-                        <strong style={{ color: '#065f46', fontSize: '13px' }}>✨ عنوان مقترح:</strong>
+                        <strong style={{ color: '#065f46', fontSize: '13px' }}>✨ عنوان SEO مقترح:</strong>
                         <p style={{ margin: '5px 0 0 0', fontSize: '13px', color: '#1f2937' }}>{p.suggestedTitle}</p>
                       </div>
 
-                      <div style={{ background: '#eff6ff', padding: '10px', borderRadius: '6px', marginBottom: '12px' }}>
+                      <div style={{ background: '#eff6ff', padding: '10px', borderRadius: '6px', marginBottom: '8px' }}>
                         <strong style={{ color: '#1e40af', fontSize: '13px' }}>📝 وصف Meta مقترح:</strong>
                         <p style={{ margin: '5px 0 0 0', fontSize: '13px', color: '#1f2937' }}>{p.suggestedDescription}</p>
                       </div>
 
-                      {/* ⭐ NEW: زر تطبيق التحسينات */}
+                      {/* ⭐ التعديل 2: عرض الوصف الطويل المقترح */}
+                      {p.suggestedLongDescription && (
+                        <div style={{ background: '#fef3c7', padding: '10px', borderRadius: '6px', marginBottom: '12px' }}>
+                          <strong style={{ color: '#92400e', fontSize: '13px' }}>📄 الوصف الطويل المقترح:</strong>
+                          <p style={{ margin: '5px 0 0 0', fontSize: '13px', color: '#1f2937', whiteSpace: 'pre-wrap' }}>{p.suggestedLongDescription}</p>
+                        </div>
+                      )}
+
                       <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                         <button
                           onClick={() => handleApplyImprovement(p)}
@@ -341,7 +348,7 @@ export default function App() {
                             ? '⏳ جاري التطبيق...' 
                             : applied?.success 
                               ? '✅ تم التطبيق على متجرك' 
-                              : '🚀 تطبيق التحسين على متجرك'}
+                              : '🚀 تطبيق كل التحسينات على متجرك'}
                         </button>
 
                         {applied?.success === false && (
